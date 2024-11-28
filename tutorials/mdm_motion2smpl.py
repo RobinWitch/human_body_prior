@@ -17,7 +17,9 @@ from colour import Color
 from loguru import logger
 from scipy.spatial.transform import Rotation as R
 from torch import nn
-
+import sys
+sys.path.append('./libs/human_body_prior/body_visualizer/src')
+sys.path.append('./libs/human_body_prior/src')
 from human_body_prior.body_model.body_model import BodyModel
 from human_body_prior.models.ik_engine import IK_Engine
 from human_body_prior.tools.omni_tools import copy2cpu as c2c
@@ -110,14 +112,16 @@ def convert_mdm_mp4_to_amass_npz(skeleton_movie_fname, out_fname=None, save_rend
     :return:
     """
 
-    support_base_dir = get_support_data_dir()
+    #support_base_dir = get_support_data_dir()
+    support_base_dir = './libs/human_body_prior/support_data'
     support_dir = osp.join(support_base_dir, 'dowloads')#'../../../support_data/dowloads'
     logger.info(f'found support_dir: {support_dir}')
     # 'TRAINED_MODEL_DIRECTORY'  in this directory the trained model along with the model code exist
     vposer_expr_dir = osp.join(support_dir,'vposer_v2_05')
 
     # 'PATH_TO_SMPLX_model.npz'  obtain from https://smpl-x.is.tue.mpg.de/downloads
-    bm_fname = osp.join(support_dir, f'models/{surface_model_type}/{gender}/model.npz')
+    # bm_fname = osp.join(support_dir, f'models/{surface_model_type}/{gender}/model.npz')
+    bm_fname = "./datasets/hub/smplx_models/smplx/SMPLX_NEUTRAL_2020.npz"
 
     if isinstance(skeleton_movie_fname, np.ndarray):
         assert out_fname is not None, 'when passing motion file out_fname should be provided'
@@ -141,7 +145,7 @@ def convert_mdm_mp4_to_amass_npz(skeleton_movie_fname, out_fname=None, save_rend
         logger.warning(f'render output already exists: {render_out_fname}. skipping...')
         return
     n_joints = 22
-    num_betas = 16
+    num_betas = 300
 
     if osp.exists(out_fname):
         d = np.load(out_fname)
@@ -192,7 +196,7 @@ def convert_mdm_mp4_to_amass_npz(skeleton_movie_fname, out_fname=None, save_rend
         d['betas'] = np.median(d['betas'], axis=0)
 
         transformed_d = transform_smpl_coordinate(bm_fname=bm_fname, trans=d['trans'], root_orient=d['root_orient'],
-                                                  betas=d['betas'], rotxyz=[90, 0, 0])
+                                                  betas=d['betas'], rotxyz=[0, 0, 0])
         d.update(transformed_d)
         d['poses'] = np.concatenate([d['root_orient'], d['pose_body'], np.zeros([len(d['pose_body']), 99])], axis=1)
 
@@ -222,12 +226,13 @@ if __name__ == '__main__':
     from glob import glob
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=str, help='skeleton movie.mp4 filename that is to be converted into SMPL')
+    parser.add_argument("--output", type=str)
     parser.add_argument("--pattern", type=str, help='filename pattern for skeleton */*/movies.mp4 to be converted into SMPL')
     parser.add_argument("--batch_size", type=int, default=128, help='batch size for inverse kinematics')
     parser.add_argument("--model_type", type=str, default='smplx', help='model_type; e.g. smplx/smpl')
     parser.add_argument("--device", type=str, default='cuda:0', help='computation device')
     parser.add_argument("--gender", type=str, default='neutral', help='gender; e.g. neutral')
-    parser.add_argument("--save_render", type=bool, default=True, help='render IK results')
+    parser.add_argument("--save_render", type=bool, default=False, help='render IK results')
     parser.add_argument("--verbosity", type=int, default=0, help='0: silent, 1: text, 2: display')
     params = parser.parse_args()
     # params = {
@@ -237,8 +242,8 @@ if __name__ == '__main__':
     if (params.input is None) and (params.pattern is None):
         raise ValueError('either input or pattern should be provided')
     if not params.input is None:
-        convert_mdm_mp4_to_amass_npz(skeleton_movie_fname=params.input,
-                                 surface_model_type=params.model_type,
+        convert_mdm_mp4_to_amass_npz(skeleton_movie_fname=np.load(params.input),
+                                 out_fname=params.output,
                                  gender=params.gender,
                                  batch_size=params.batch_size,
                                  save_render=params.save_render,
