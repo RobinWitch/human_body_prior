@@ -1,0 +1,3 @@
+[submodule "body_visualizer"]
+	path = body_visualizer
+	url = https://github.com/nghorbani/body_visualizer.git
